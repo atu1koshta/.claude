@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# Allow directory traversal
+!*/
+
+# Track these only
+!.gitignore
+!settings.json
+!agents/**
+!mcp-servers/**
