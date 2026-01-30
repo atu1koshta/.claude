@@ -7,30 +7,30 @@ from typing import Any
 from mcp.types import Tool, TextContent
 
 from jira_mcp.client import JiraClient
-from jira_mcp.tools.base import BaseTool
+from jira_mcp.confluence_client import ConfluenceClient
+from jira_mcp.tools.base import BaseTool, ConfluenceBaseTool
 
 
 class ToolRegistry:
-    def __init__(self, client: JiraClient) -> None:
-        self._tools: dict[str, BaseTool] = {}
-        self._discover(client)
+    def __init__(self, jira_client: JiraClient, confluence_client: ConfluenceClient) -> None:
+        self._tools: dict[str, BaseTool | ConfluenceBaseTool] = {}
+        self._discover(jira_client, confluence_client)
 
-    def _discover(self, client: JiraClient) -> None:
-        package = importlib.import_module("jira_mcp.tools")
-        for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-            if modname in ("base", "__init__"):
-                continue
-            module = importlib.import_module(f"jira_mcp.tools.{modname}")
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
-                if (
-                    isinstance(attr, type)
-                    and issubclass(attr, BaseTool)
-                    and attr is not BaseTool
-                    and hasattr(attr, "name")
-                ):
-                    instance = attr(client)
-                    self._tools[instance.name] = instance
+    def _discover(self, jira_client: JiraClient, confluence_client: ConfluenceClient) -> None:
+        for pkg_name in ("jira_mcp.tools.jira", "jira_mcp.tools.confluence"):
+            package = importlib.import_module(pkg_name)
+            for _importer, modname, _ispkg in pkgutil.iter_modules(package.__path__):
+                module = importlib.import_module(f"{pkg_name}.{modname}")
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+                    if not (isinstance(attr, type) and hasattr(attr, "name")):
+                        continue
+                    if issubclass(attr, ConfluenceBaseTool) and attr is not ConfluenceBaseTool:
+                        instance = attr(confluence_client)
+                        self._tools[instance.name] = instance
+                    elif issubclass(attr, BaseTool) and attr is not BaseTool:
+                        instance = attr(jira_client)
+                        self._tools[instance.name] = instance
 
     def list_tools(self) -> list[Tool]:
         return [

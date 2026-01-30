@@ -8,13 +8,15 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
 from jira_mcp.client import JiraClient
+from jira_mcp.confluence_client import ConfluenceClient
 from jira_mcp.tools import ToolRegistry
 
 
-def create_server() -> tuple[Server, JiraClient]:
+def create_server() -> tuple[Server, JiraClient, ConfluenceClient]:
     app = Server("jira-mcp")
-    client = JiraClient()
-    registry = ToolRegistry(client)
+    jira_client = JiraClient()
+    confluence_client = ConfluenceClient()
+    registry = ToolRegistry(jira_client, confluence_client)
 
     @app.list_tools()
     async def list_tools():
@@ -24,16 +26,17 @@ def create_server() -> tuple[Server, JiraClient]:
     async def call_tool(name: str, arguments: dict):
         return await registry.call_tool(name, arguments)
 
-    return app, client
+    return app, jira_client, confluence_client
 
 
 async def main() -> None:
-    app, client = create_server()
+    app, jira_client, confluence_client = create_server()
     try:
         async with stdio_server() as (read_stream, write_stream):
             await app.run(read_stream, write_stream, app.create_initialization_options())
     finally:
-        await client.close()
+        await jira_client.close()
+        await confluence_client.close()
 
 
 if __name__ == "__main__":
